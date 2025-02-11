@@ -1,51 +1,86 @@
 """
-A simple script to read trade data from CSV,
-apply basic compliance rules (e.g., front-running, MNPI checks),
-and write any suspicious trades to an output report.
+A script to read trade data from CSV, apply compliance rules, and generate a report of suspicious trades.
+
+This module includes functions for reading trade data, checking against compliance rules (front-running,
+MNPI checks, restricted list, margin usage), and writing a report. Error handling is implemented to log
+exceptions with stack traces to a rotating file (max 1MB per file, up to 5 backups).
 """
 
 import csv
 import os
+import sys
+import logging
+import traceback
 from datetime import datetime, timedelta
-from typing import List, Dict
+from logging.handlers import RotatingFileHandler
+from typing import List, Dict, Any
 
 
 def read_trades(file_path: str) -> List[Dict[str, str]]:
     """
     Reads trade data from a CSV file and returns it as a list of dictionaries.
 
-    Each trade dictionary will be augmented with a 'TradeID' that reflects
-    the row index (1-based).
+    Each trade is augmented with a 'TradeID' corresponding to its row index (1-based).
 
-    :param file_path: Path to the CSV file containing trades.
-    :return: A list of dictionaries where each dictionary represents a trade.
+    Args:
+        file_path (str): Path to the CSV file containing trades.
+
+    Returns:
+        List[Dict[str, str]]: List of dictionaries, each representing a trade with 'TradeID' added.
+
+    Raises:
+        FileNotFoundError: If `file_path` does not exist.
+        PermissionError: If read permission is denied for `file_path`.
+        UnicodeDecodeError: If file is not UTF-8 encoded.
+        csv.Error: For CSV parsing errors.
+        Exception: For unexpected errors (logged and re-raised).
+
+    Side Effects:
+        Reads from the filesystem.
     """
-    trades = []
-    with open(file_path, 'r', encoding='utf-8') as csv_file:
-        reader = csv.DictReader(csv_file)
-        for i, row in enumerate(reader, start=1):
-            # Add a trade identifier
-            row["TradeID"] = str(i)
-            trades.append(row)
+    trades: List[Dict[str, str]] = []
+    try:
+        with open(file_path, 'r', encoding='utf-8') as csv_file:
+            reader = csv.DictReader(csv_file)
+            for i, row in enumerate(reader, start=1):
+                row["TradeID"] = str(i)
+                trades.append(row)
+    except (FileNotFoundError, PermissionError, UnicodeDecodeError, csv.Error) as e:
+        logging.error(f"Error reading CSV file {file_path}: {str(e)}")
+        logging.error(traceback.format_exc())
+        raise
+    except Exception as e:
+        logging.error(f"Unexpected error reading CSV file {file_path}: {str(e)}")
+        logging.error(traceback.format_exc())
+        raise
     return trades
 
 
 def check_rules(trades: List[Dict[str, str]]) -> List[Dict[str, str]]:
     """
-    Applies a set of simplified compliance checks to the given trades
-    (front-running, MNPI large volume, restricted list, margin usage).
+    Applies compliance rules to trades to detect suspicious activity.
 
-    :param trades: A list of trade dictionaries (as returned by read_trades).
-    :return: A list of report entries (dictionaries) describing suspicious trades.
+    Rules include:
+    - Front-running: Employee trades preceding client trades in the same security.
+    - MNPI (Material Non-Public Information): Large trades without public news.
+    - Restricted List: Trades in restricted securities.
+    - Margin Misuse: Margin usage in cash accounts.
+
+    Args:
+        trades (List[Dict[str, str]]): List of trades from `read_trades`.
+
+    Returns:
+        List[Dict[str, str]]: List of report entries for suspicious trades.
+
+    Side Effects:
+        Logs parsing errors to `compliance_errors.log`.
     """
-    report = []
+    report: List[Dict[str, str]] = []
 
-    # Partition trades into employees vs. clients for front-running checks
     employees = [t for t in trades if t.get("Trader_Type") == "Employee"]
     clients = [t for t in trades if t.get("Trader_Type") == "Client"]
 
     # RULE 1: Front-running
-    # -------------------------------------------------
     for emp_trade in employees:
         emp_security = emp_trade.get("Security", "")
         emp_date_str = emp_trade.get("Date", "")
@@ -54,8 +89,12 @@ def check_rules(trades: List[Dict[str, str]]) -> List[Dict[str, str]]:
         try:
             emp_date = datetime.strptime(emp_date_str, '%Y-%m-%d')
             emp_volume = int(emp_volume_str)
-        except (ValueError, TypeError):
-            # If we can't parse the date or volume, skip this trade
+        except (ValueError, TypeError) as e:
+            logging.error(
+                f"RULE 1: Error parsing date '{emp_date_str}' or volume '{emp_volume_str}' "
+                f"for TradeID {emp_trade.get('TradeID', 'unknown')}: {e}"
+            )
+            logging.error(traceback.format_exc())
             continue
 
         next_day = emp_date + timedelta(days=1)
@@ -70,10 +109,14 @@ def check_rules(trades: List[Dict[str, str]]) -> List[Dict[str, str]]:
             try:
                 cli_date = datetime.strptime(cli_date_str, '%Y-%m-%d')
                 cli_volume = int(cli_volume_str)
-            except (ValueError, TypeError):
+            except (ValueError, TypeError) as e:
+                logging.error(
+                    f"RULE 1: Error parsing client date '{cli_date_str}' or volume '{cli_volume_str}' "
+                    f"for TradeID {cli_trade.get('TradeID', 'unknown')}: {e}"
+                )
+                logging.error(traceback.format_exc())
                 continue
 
-            # Check if client trades on same or next day AND employee volume >= client volume
             if emp_date <= cli_date <= next_day and emp_volume >= cli_volume:
                 reason = (
                     f"Front-running: Employee volume ({emp_volume}) >= "
@@ -81,7 +124,7 @@ def check_rules(trades: List[Dict[str, str]]) -> List[Dict[str, str]]:
                 )
                 report.append({
                     "TradeID": emp_trade["TradeID"],
-                    "Date": emp_trade["Date"],
+                    "Date": emp_date_str,
                     "Trader": emp_trade.get("Trader", ""),
                     "Security": emp_security,
                     "RuleID": "1",
@@ -89,7 +132,6 @@ def check_rules(trades: List[Dict[str, str]]) -> List[Dict[str, str]]:
                 })
 
     # RULE 2: Potential MNPI - Large Volume
-    # -------------------------------------------------
     for trade in trades:
         if trade.get("Trader_Type") != "Employee":
             continue
@@ -101,10 +143,14 @@ def check_rules(trades: List[Dict[str, str]]) -> List[Dict[str, str]]:
         try:
             volume = int(volume_str)
             avg_volume = int(avg_volume_str)
-        except (ValueError, TypeError):
+        except (ValueError, TypeError) as e:
+            logging.error(
+                f"RULE 2: Error parsing volume '{volume_str}' or avg volume '{avg_volume_str}' "
+                f"for TradeID {trade.get('TradeID', 'unknown')}: {e}"
+            )
+            logging.error(traceback.format_exc())
             continue
 
-        # If volume > 2x average volume and there's no public news
         if volume > 2 * avg_volume and public_news == "no":
             reason = (
                 f"Potential MNPI: trade volume ({volume}) > 2× avg volume ({avg_volume}) "
@@ -120,7 +166,6 @@ def check_rules(trades: List[Dict[str, str]]) -> List[Dict[str, str]]:
             })
 
     # RULE 20: Restricted List Check
-    # -------------------------------------------------
     for trade in trades:
         if trade.get("Trader_Type") != "Employee":
             continue
@@ -128,11 +173,8 @@ def check_rules(trades: List[Dict[str, str]]) -> List[Dict[str, str]]:
         security = trade.get("Security", "")
         restricted_list = trade.get("Restricted_List", "")
 
-        # If the trade's security is exactly the one in restricted_list
         if restricted_list and security == restricted_list:
-            reason = (
-                f"Employee Code Violation: Security ({security}) is on the restricted list."
-            )
+            reason = f"Employee Code Violation: Security ({security}) is on the restricted list."
             report.append({
                 "TradeID": trade["TradeID"],
                 "Date": trade.get("Date", ""),
@@ -143,7 +185,6 @@ def check_rules(trades: List[Dict[str, str]]) -> List[Dict[str, str]]:
             })
 
     # RULE 25: Margin Used in a Cash Account
-    # -------------------------------------------------
     for trade in trades:
         if trade.get("Trader_Type") != "Employee":
             continue
@@ -152,9 +193,7 @@ def check_rules(trades: List[Dict[str, str]]) -> List[Dict[str, str]]:
         client_agreement = trade.get("ClientAgreement", "").lower()
 
         if margin_used == "yes" and client_agreement == "cashaccount":
-            reason = (
-                "Margin Use Not Authorized: 'MarginUsed=Yes' in a 'CashAccount'."
-            )
+            reason = "Margin Use Not Authorized: 'MarginUsed=Yes' in a 'CashAccount'."
             report.append({
                 "TradeID": trade["TradeID"],
                 "Date": trade.get("Date", ""),
@@ -169,39 +208,87 @@ def check_rules(trades: List[Dict[str, str]]) -> List[Dict[str, str]]:
 
 def write_report(report: List[Dict[str, str]], output_file: str) -> None:
     """
-    Writes the suspicious trades report to a specified CSV file.
+    Writes the suspicious trades report to a CSV file.
+    Ensures the output directory exists, preventing failures.
 
-    :param report: A list of dictionaries, each describing a suspicious trade.
-    :param output_file: The file path where the CSV will be written.
+    Args:
+        report (List[Dict[str, str]]): Suspicious trades to report.
+        output_file (str): Path to the output CSV file.
+
+    Side Effects:
+        - Creates missing directories automatically.
+        - Writes data to the CSV file.
+        - Logs errors but does NOT fail the program execution.
     """
     fieldnames = ["TradeID", "Date", "Trader", "Security", "RuleID", "Reason"]
-    os.makedirs(os.path.dirname(output_file), exist_ok=True)
 
-    with open(output_file, "w", newline="", encoding="utf-8") as csv_file:
-        writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
-        writer.writeheader()
-        for entry in report:
-            writer.writerow(entry)
+    try:
+        # Ensure the directory exists, create it if missing
+        output_dir = os.path.dirname(output_file)
+        if output_dir:
+            os.makedirs(output_dir, exist_ok=True)
+
+        # Open and write to the CSV file
+        with open(output_file, "w", newline="", encoding="utf-8") as csv_file:
+            writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+            writer.writeheader()
+            for entry in report:
+                writer.writerow(entry)
+
+        logging.info(f"Report successfully written to {output_file}")
+        print(f"✅ Report successfully written to: {output_file}")
+
+    except (PermissionError, IsADirectoryError, csv.Error) as e:
+        logging.error(f"⚠️ Error writing report to {output_file}: {str(e)}")
+        logging.error(traceback.format_exc())
+        print(f"⚠️ Warning: Could not write report to {output_file}. Check permissions.")
+
+    except Exception as e:
+        logging.error(f"⚠️ Unexpected error writing report to {output_file}: {str(e)}")
+        logging.error(traceback.format_exc())
+        print(f"⚠️ Warning: Unexpected issue while writing the report. Continuing execution.")
+
 
 
 def main() -> None:
     """
-    Main execution flow:
-      1. Reads trades from 'trades.csv'
-      2. Checks them against defined rules
-      3. Writes a suspicious trades report to the appropriate file.
+    Orchestrates the compliance check workflow.
+
+    Logs are saved to `compliance_errors.log` with rotation (1MB per file, 5 backups).
+
+    Raises:
+        SystemExit: Exits with code 1 on critical errors.
     """
-    trades = read_trades("trades.csv")
-    suspicious_report = check_rules(trades)
+    try:
+        logging.basicConfig(
+            handlers=[
+                RotatingFileHandler(
+                    'compliance_errors.log',
+                    maxBytes=1024 * 1024,  # 1MB
+                    backupCount=5,
+                    encoding='utf-8'
+                )
+            ],
+            level=logging.ERROR,
+            format='%(asctime)s - %(levelname)s - %(message)s'
+        )
 
-    # Choose the output path depending on whether we're in Docker
-    if os.getenv("RUNNING_IN_DOCKER"):
-        output_file = "/app/suspicious_trades_report.csv"  # Docker path
-    else:
-        output_file = "output/suspicious_trades_report.csv"  # Local path
+        trades = read_trades("trades.csv")
+        suspicious_report = check_rules(trades)
 
-    write_report(suspicious_report, output_file)
-    print(f"Report generated: {output_file}")
+        output_file = (
+            "/app/suspicious_trades_report.csv"
+            if os.getenv("RUNNING_IN_DOCKER")
+            else "output/suspicious_trades_report.csv"
+        )
+
+        write_report(suspicious_report, output_file)
+        print(f"Report generated: {output_file}")
+    except Exception as e:
+        logging.error(f"Critical error in main execution: {str(e)}")
+        logging.error(traceback.format_exc())
+        print("An error occurred. Check compliance_errors.log for details.", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

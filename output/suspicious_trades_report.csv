@@ -1,10 +1,1 @@
-TradeID,Date,Trader,Security,RuleID,Reason
-1,2025-01-10,John Doe,ABC,1,Front-running: Employee volume (500) >= Client volume (200) on same or next day.
-3,2025-01-11,Emily Clark,XYZ,1,Front-running: Employee volume (6000) >= Client volume (2000) on same or next day.
-12,2025-01-15,Tom Adams,MNO,1,Front-running: Employee volume (10000) >= Client volume (2000) on same or next day.
-1,2025-01-10,John Doe,ABC,2,Potential MNPI: trade volume (500) > 2× avg volume (200) with no public news.
-3,2025-01-11,Emily Clark,XYZ,2,Potential MNPI: trade volume (6000) > 2× avg volume (2500) with no public news.
-8,2025-01-13,Emily Clark,ABC,2,Potential MNPI: trade volume (700) > 2× avg volume (300) with no public news.
-12,2025-01-15,Tom Adams,MNO,2,Potential MNPI: trade volume (10000) > 2× avg volume (2000) with no public news.
-5,2025-01-12,John Doe,ZZZ,20,Employee Code Violation: Security (ZZZ) is on the restricted list.
-5,2025-01-12,John Doe,ZZZ,25,Margin Use Not Authorized: 'MarginUsed=Yes' in a 'CashAccount'.
+..
