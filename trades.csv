@@ -1,0 +1,14 @@
+Date,Trader,Trader_Type,Security,Volume,Price,Public_News,MarketPrice,AvgVolume,ClientSaid,Authorization,Family_Account,Restricted_List,SoftDollarBenefit,CommissionRate,ResearchReportPositive,ReportReleaseDate,TradeType,UpgradeReleaseDate,EarningsDay,SubsequentSellOff,SecurityPromoted,OrderType,CancelRate,Buyer,Seller,TradeTime,PriceMove,ClientAccount,Turnover,MarginUsed,ClientAgreement,OutsideBusiness,EmployerNotInformed,ReferralFeeReceived,ClientNotInformed,DifferentPricesForSameSecurity,ClientProfiles,CommissionOnlyPaidIfOutcome,InternalResearchUpgrade
+2025-01-10,John Doe,Employee,ABC,500,50.00,No,49.90,200,Yes,None,Yes,,No,0.02,No,,,2025-01-10,No,No,No,Limit,10%,,,15:55,6%,FeeBased,3,No,CashAccount,Yes,No,No,No,No,No,No,No
+2025-01-10,Jane Smith,Client,ABC,200,49.75,No,49.90,200,Yes,Yes,,,No,0.02,No,,,2025-01-10,No,No,No,Limit,10%,,,15:55,6%,FeeBased,3,No,CashAccount,,,No,No,No,No,No,No,No,No
+2025-01-11,Emily Clark,Employee,XYZ,6000,10.25,No,10.20,2500,No,None,No,,No,0.05,No,,,No,No,No,Market,0%,,,10:00,0%,FeeBased,1,No,CashAccount,,,No,No,No,No,No,No,No,No
+2025-01-11,Mark Lee,Client,XYZ,2000,10.30,Yes,10.20,2500,Yes,Yes,,,No,0.03,No,,,No,No,No,Market,0%,,,10:01,0%,FeeBased,1,No,CashAccount,,,No,No,No,No,No,No,No,No
+2025-01-12,John Doe,Employee,ZZZ,100,15.00,No,15.10,100,No,Yes,No,ZZZ,No,0.02,Yes,2025-01-13,Buy,,No,No,No,Market,0%,,,11:00,0%,FeeBased,2,Yes,CashAccount,,,No,No,No,No,No,No,Yes,No
+2025-01-12,Amy Wong,Client,ZZZ,200,15.05,No,15.10,100,No,Yes,,,No,0.02,No,,,No,No,No,Market,0%,,,11:01,0%,FeeBased,2,No,CashAccount,,,No,No,No,No,No,No,No,No
+2025-01-13,John Doe,Employee,ABC,600,51.00,No,51.10,300,No,Yes,Yes,,No,0.02,No,,,Yes,No,No,Market,0%,,,09:30,0%,FeeBased,2,Yes,CashAccount,,,No,No,No,No,No,No,No,Yes
+2025-01-13,Emily Clark,Employee,ABC,700,50.50,No,51.10,300,No,Yes,No,,No,0.02,No,,,Yes,No,No,Market,0%,,,09:31,0%,FeeBased,2,Yes,CashAccount,,,No,No,No,No,No,No,No,Yes
+2025-01-13,Michael Brown,Client,ABC,800,51.05,No,51.10,300,No,Yes,,,No,0.02,No,,,Yes,No,No,Market,0%,,,09:32,0%,FeeBased,2,No,CashAccount,,,No,No,No,No,No,No,No,No
+2025-01-13,John Doe,Employee,XYZ,3000,10.10,No,10.00,1500,No,Yes,No,,No,0.02,No,,,No,No,No,Limit,5%,,,15:58,6%,FeeBased,3,No,CashAccount,,,No,No,No,No,No,No,No,No
+2025-01-14,Mark Lee,Client,XYZ,5000,10.15,No,10.10,1500,Yes,Yes,,,No,0.02,No,,,No,No,No,Limit,5%,,,15:59,6%,FeeBased,3,No,CashAccount,,,No,No,No,No,No,No,No,No
+2025-01-15,Tom Adams,Employee,MNO,10000,20.00,No,19.50,2000,No,Yes,No,,Personal,0.10,No,,,No,No,No,Market,0%,,,09:00,0%,FeeBased,1,No,CashAccount,,,Yes,Yes,No,No,No,No,No,No
+2025-01-15,Anna Kim,Client,MNO,2000,20.10,No,19.50,2000,No,Yes,,,No,0.02,No,,,No,No,No,Market,0%,,,09:01,0%,FeeBased,1,No,CashAccount,,,No,No,No,No,No,No,No,No
